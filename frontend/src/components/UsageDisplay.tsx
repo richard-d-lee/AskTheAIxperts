@@ -7,7 +7,6 @@ interface Props {
 export default function UsageDisplay({ usage }: Props) {
   if (!usage) return null;
 
-  const percentage = Math.round((usage.used / usage.limit) * 100);
   const isLow = usage.remaining <= 5;
   const isVeryLow = usage.remaining <= 2;
 
