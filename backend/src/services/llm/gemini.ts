@@ -4,7 +4,7 @@ import type { ExpertResponse } from '../../types/index.js';
 
 const genAI = new GoogleGenerativeAI(config.llm.gemini);
 
-const MODEL = 'gemini-1.5-flash-latest';
+const MODEL = 'gemini-2.5-flash';
 
 export async function queryGemini(
   systemPrompt: string,
