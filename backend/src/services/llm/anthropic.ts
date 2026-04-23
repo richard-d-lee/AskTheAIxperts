@@ -72,6 +72,22 @@ export async function validateQuestion(
   }
 }
 
+function extractJSON(text: string): string {
+  // Try to extract JSON from markdown code blocks
+  const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonBlockMatch) {
+    return jsonBlockMatch[1].trim();
+  }
+
+  // Try to find JSON object in the text
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return jsonMatch[0];
+  }
+
+  return text;
+}
+
 export async function consolidateResponses(
   question: string,
   responses: ExpertResponse[]
@@ -83,21 +99,15 @@ export async function consolidateResponses(
   recommendation: string;
 }> {
   const systemPrompt = `You are an expert analyst tasked with consolidating responses from multiple AI assistants.
-Analyze the responses and provide:
-1. A summary of the key information
-2. Points where the AIs agree
-3. Points where the AIs disagree
-4. A consensus score (0-100) indicating how much the AIs agree
-5. A final recommendation based on the consensus
+Analyze the responses and provide a JSON object with these fields:
+- summary: A clear, readable paragraph summarizing the key information (not JSON, just plain text)
+- agreements: Array of points where the AIs agree
+- disagreements: Array of points where the AIs disagree
+- consensusScore: Number from 0-100 indicating agreement level
+- recommendation: A clear, actionable recommendation paragraph
 
-Respond in JSON format:
-{
-  "summary": "Brief summary of the combined advice",
-  "agreements": ["Point 1", "Point 2"],
-  "disagreements": ["Point 1", "Point 2"],
-  "consensusScore": 85,
-  "recommendation": "Final recommendation"
-}`;
+IMPORTANT: Return ONLY valid JSON, no markdown code blocks, no extra text. Example:
+{"summary": "The experts agree that...", "agreements": ["Point 1", "Point 2"], "disagreements": ["Point 1"], "consensusScore": 85, "recommendation": "Based on the consensus..."}`;
 
   const responsesText = responses
     .filter((r) => !r.error && r.response)
@@ -117,14 +127,25 @@ Respond in JSON format:
   const text = textContent ? textContent.text : '';
 
   try {
-    return JSON.parse(text);
-  } catch {
+    const jsonText = extractJSON(text);
+    const parsed = JSON.parse(jsonText);
+
+    // Ensure all required fields exist with proper types
     return {
-      summary: text,
+      summary: String(parsed.summary || ''),
+      agreements: Array.isArray(parsed.agreements) ? parsed.agreements : [],
+      disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
+      consensusScore: typeof parsed.consensusScore === 'number' ? parsed.consensusScore : 0,
+      recommendation: String(parsed.recommendation || ''),
+    };
+  } catch {
+    // If parsing fails, try to create a reasonable response from the text
+    return {
+      summary: text.substring(0, 500),
       agreements: [],
       disagreements: [],
       consensusScore: 0,
-      recommendation: 'Unable to parse consolidated response',
+      recommendation: 'Unable to parse consolidated response. Please try again.',
     };
   }
 }
