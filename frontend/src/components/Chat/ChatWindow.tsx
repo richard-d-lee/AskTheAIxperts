@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
 import * as api from '../../api/client';
 import ExpertResponse from './ExpertResponse';
 import ConsolidatedView from './ConsolidatedView';
