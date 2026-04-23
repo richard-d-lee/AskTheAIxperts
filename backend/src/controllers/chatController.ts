@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler.js';
 import { getModule, isValidModule } from '../modules/index.js';
 import { validateQuestion, consolidateResponses, queryAllLLMs } from '../services/llm/index.js';
+import { incrementUsage, getUserUsageStats } from '../middleware/usageQuota.js';
 import type { ChatResponse, ExpertResponse } from '../types/index.js';
 
 const prisma = new PrismaClient();
@@ -12,6 +13,16 @@ const chatSchema = z.object({
   question: z.string().min(1, 'Question is required').max(2000, 'Question too long'),
   conversationId: z.string().uuid().optional(),
 });
+
+export const getUsageStats = async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const stats = await getUserUsageStats(userId);
+
+  res.json({
+    success: true,
+    data: stats,
+  });
+};
 
 export const handleChat = async (req: Request, res: Response) => {
   const moduleType = req.params.module as string;
@@ -28,6 +39,7 @@ export const handleChat = async (req: Request, res: Response) => {
 
   const { question, conversationId } = validation.data;
   const userId = req.user!.userId;
+  const usageRecordId = (req as any).usageRecordId;
 
   const moduleConfig = getModule(moduleType)!;
 
@@ -38,6 +50,7 @@ export const handleChat = async (req: Request, res: Response) => {
   );
 
   if (!validationResult.valid) {
+    // Don't count invalid questions against quota
     const response: ChatResponse = {
       validation: validationResult,
       expertResponses: [],
@@ -49,6 +62,12 @@ export const handleChat = async (req: Request, res: Response) => {
       success: true,
       data: response,
     });
+  }
+
+  // Increment usage BEFORE making expensive API calls
+  // This prevents users from spamming requests
+  if (usageRecordId) {
+    await incrementUsage(usageRecordId);
   }
 
   // Layer 2: Query all LLMs in parallel
@@ -126,6 +145,9 @@ export const handleChat = async (req: Request, res: Response) => {
     },
   });
 
+  // Get updated usage stats to return to frontend
+  const usageStats = await getUserUsageStats(userId);
+
   const response: ChatResponse = {
     validation: validationResult,
     expertResponses,
@@ -136,5 +158,6 @@ export const handleChat = async (req: Request, res: Response) => {
   res.json({
     success: true,
     data: response,
+    usage: usageStats,
   });
 };

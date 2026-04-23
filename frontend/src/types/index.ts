@@ -55,8 +55,16 @@ export interface Conversation {
   _count?: { messages: number };
 }
 
+export interface UsageStats {
+  used: number;
+  limit: number;
+  remaining: number;
+  role: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  usage?: UsageStats;
 }

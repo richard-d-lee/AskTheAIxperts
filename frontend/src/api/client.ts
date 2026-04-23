@@ -4,6 +4,7 @@ import type {
   ChatResponse,
   Conversation,
   ModuleType,
+  UsageStats,
 } from '../types';
 
 const API_BASE = import.meta.env.PROD ? '' : '';
@@ -59,10 +60,14 @@ export async function sendMessage(
   question: string,
   conversationId?: string
 ) {
-  return request<ApiResponse<ChatResponse>>(`/api/chat/${module}`, {
+  return request<ApiResponse<ChatResponse> & { usage?: UsageStats }>(`/api/chat/${module}`, {
     method: 'POST',
     body: JSON.stringify({ question, conversationId }),
   });
+}
+
+export async function getUsageStats() {
+  return request<ApiResponse<UsageStats>>('/api/chat/usage');
 }
 
 // History

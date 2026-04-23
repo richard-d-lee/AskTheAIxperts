@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import * as api from '../../api/client';
 import ExpertResponse from './ExpertResponse';
 import ConsolidatedView from './ConsolidatedView';
-import type { ModuleType, Message, ExpertResponse as ExpertResponseType, ConsolidationResult } from '../../types';
+import UsageDisplay from '../UsageDisplay';
+import type { ModuleType, Message, ExpertResponse as ExpertResponseType, ConsolidationResult, UsageStats } from '../../types';
 
 interface ChatMessage {
   id: string;
@@ -34,13 +35,26 @@ export default function ChatWindow() {
     initialConversationId
   );
   const [expandedResponses, setExpandedResponses] = useState<Set<string>>(new Set());
+  const [usage, setUsage] = useState<UsageStats | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    loadUsageStats();
     if (initialConversationId) {
       loadConversation(initialConversationId);
     }
   }, [initialConversationId]);
+
+  const loadUsageStats = async () => {
+    try {
+      const res = await api.getUsageStats();
+      if (res.data) {
+        setUsage(res.data);
+      }
+    } catch (error) {
+      console.error('Failed to load usage stats:', error);
+    }
+  };
 
   const loadConversation = async (id: string) => {
     try {
@@ -74,6 +88,18 @@ export default function ChatWindow() {
     e.preventDefault();
     if (!input.trim() || loading || !module) return;
 
+    // Check if user has queries remaining
+    if (usage && usage.remaining <= 0) {
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString() + '-error',
+        role: 'assistant',
+        content: 'Daily limit reached',
+        validationError: `You've used all ${usage.limit} queries for today. Please try again tomorrow.`,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -89,6 +115,11 @@ export default function ChatWindow() {
 
       if (!res.data) {
         throw new Error('No response data');
+      }
+
+      // Update usage stats from response
+      if (res.usage) {
+        setUsage(res.usage);
       }
 
       const { validation, expertResponses, consolidation, conversationId: newConvId } =
@@ -147,12 +178,17 @@ export default function ChatWindow() {
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <h2 className="text-xl font-semibold text-gray-900">
-          {moduleNames[module]} Advisor
-        </h2>
-        <p className="text-sm text-gray-500">
-          Ask your questions and get insights from multiple AI experts
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {moduleNames[module]} Advisor
+            </h2>
+            <p className="text-sm text-gray-500">
+              Ask your questions and get insights from multiple AI experts
+            </p>
+          </div>
+          <UsageDisplay usage={usage} />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
@@ -252,16 +288,21 @@ export default function ChatWindow() {
             onChange={(e) => setInput(e.target.value)}
             placeholder={`Ask a ${moduleNames[module].toLowerCase()} question...`}
             className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            disabled={loading}
+            disabled={loading || (usage !== null && usage.remaining <= 0)}
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={loading || !input.trim() || (usage !== null && usage.remaining <= 0)}
             className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Send
           </button>
         </form>
+        {usage && usage.remaining <= 0 && (
+          <p className="text-center text-red-600 text-sm mt-2">
+            Daily limit reached. Please try again tomorrow.
+          </p>
+        )}
       </div>
     </div>
   );

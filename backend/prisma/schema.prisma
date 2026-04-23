@@ -11,9 +11,27 @@ model User {
   id            String         @id @default(uuid())
   email         String         @unique
   passwordHash  String
+  role          String         @default("user") // user, premium, admin
+  dailyLimit    Int            @default(20) // queries per day
+  isBlocked     Boolean        @default(false)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   conversations Conversation[]
+  usageRecords  UsageRecord[]
+}
+
+model UsageRecord {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now()) @db.Date
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
 }
 
 model Conversation {
