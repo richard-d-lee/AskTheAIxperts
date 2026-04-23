@@ -14,7 +14,7 @@ const chatSchema = z.object({
 });
 
 export const handleChat = async (req: Request, res: Response) => {
-  const { module: moduleType } = req.params;
+  const moduleType = req.params.module as string;
 
   if (!isValidModule(moduleType)) {
     throw new AppError(`Invalid module: ${moduleType}. Valid modules are: healthcare, legal, travel, insurance, financial`, 400);

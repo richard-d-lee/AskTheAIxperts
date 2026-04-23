@@ -27,7 +27,7 @@ export const getConversations = async (req: Request, res: Response) => {
 };
 
 export const getConversation = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   const conversation = await prisma.conversation.findFirst({
     where: {
@@ -52,7 +52,7 @@ export const getConversation = async (req: Request, res: Response) => {
 };
 
 export const deleteConversation = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   const conversation = await prisma.conversation.findFirst({
     where: {
