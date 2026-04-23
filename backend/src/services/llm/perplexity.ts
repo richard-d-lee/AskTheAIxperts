@@ -30,7 +30,9 @@ export async function queryPerplexity(
       throw new Error(`Perplexity API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      choices: Array<{ message?: { content?: string } }>;
+    };
 
     return {
       provider: 'perplexity',
